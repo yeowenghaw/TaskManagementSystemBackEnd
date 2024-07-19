@@ -1,0 +1,14 @@
+node index.js
+
+Node JS is the platform but Express is the framework
+
+packages needed
+npm install express
+  express is the framework we are using
+npm install dotenv
+https://www.npmjs.com/package/dotenv
+  loads environment variables from a .env file, so that environment variables are seperate from code
+
+use routes overhere to implement the rest api(?), so frontend will make calls here which will then make calls to the database
+
+
