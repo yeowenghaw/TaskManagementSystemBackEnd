@@ -10,7 +10,12 @@ npm install express
 npm install dotenv
 https://www.npmjs.com/package/dotenv
   loads environment variables from a .env file, so that environment variables are seperate from code
+npm install mysql2
+https://www.npmjs.com/package/mysql2
+https://sidorares.github.io/node-mysql2/docs
+
 
 use routes overhere to implement the rest api(?), so frontend will make calls here which will then make calls to the database
 
-
+https://www.restack.io/docs/directus-knowledge-mysql2-vs-mysql-directus-comparison 
+differences between MySQL and mysql2, why we are using mysql2 over mysql
