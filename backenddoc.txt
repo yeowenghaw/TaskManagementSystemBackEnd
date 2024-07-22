@@ -1,3 +1,5 @@
+cd Desktop/TaskManagementSystem/tmsbackend
+
 node index.js
 
 Node JS is the platform but Express is the framework
