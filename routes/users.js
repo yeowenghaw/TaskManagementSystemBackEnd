@@ -2,8 +2,8 @@ const express = require("express");
 const router = express.Router();
 
 // importing controller methods form sampleCotroller
-const { getSample } = require("../controller/sampleController");
+const { getUsers } = require("../controller/userController");
 
-router.route('/sample').get(getSample);
+router.route('/users').get(getUsers);
 
 module.exports = router;

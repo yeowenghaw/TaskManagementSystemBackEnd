@@ -13,9 +13,19 @@ https://www.npmjs.com/package/dotenv
 npm install mysql2
 https://www.npmjs.com/package/mysql2
 https://sidorares.github.io/node-mysql2/docs
-
+	mysql2 is secure and faster over MySQL npm library, check sources for more information
 
 use routes overhere to implement the rest api(?), so frontend will make calls here which will then make calls to the database
 
 https://www.restack.io/docs/directus-knowledge-mysql2-vs-mysql-directus-comparison 
-differences between MySQL and mysql2, why we are using mysql2 over mysql
+differences between MySQL and mysql2, why we are using mysql2 over MySQL
+
+database security, host, username, password is all stored inside the config.env file which the end user will not have access to.
+
+// MySQL setup, creating database and creating user table
+CREATE DATABASE IF NOT EXISTS `nodelogin` DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci; USE `nodelogin`;
+
+CREATE TABLE IF NOT EXISTS `user` (`id` INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT, `username` varchar(50) NOT NULL UNIQUE, `password` varchar(255) NOT NULL, `email` varchar(100) NOT NULL, `disabled` BOOL NOT NULL ) AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+//
+
+each query should be a single connection, 
