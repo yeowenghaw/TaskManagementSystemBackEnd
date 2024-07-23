@@ -6,7 +6,7 @@ const mysql = require("mysql2");
 dotenv.config({ path: "./config/config.env" });
 
 // Function to connect to database and execute statement asynchronously
-const connectDatabase = async statement => {
+const connectDatabase = async (statement, param) => {
   // Create MySQL connection
   const con = mysql.createConnection({
     host: process.env.HOST,
@@ -30,9 +30,9 @@ const connectDatabase = async statement => {
   };
 
   // Promisify the query method
-  const queryPromise = sql => {
+  const queryPromise = (sql, values) => {
     return new Promise((resolve, reject) => {
-      con.query(sql, (err, result) => {
+      con.query(sql, values, (err, result) => {
         if (err) {
           reject(err);
         } else {
@@ -49,7 +49,7 @@ const connectDatabase = async statement => {
     // Execute statement and return result
     const sql = statement;
     console.log("Executing statement:", statement);
-    const result = await queryPromise(sql);
+    const result = await queryPromise(sql, param);
     console.log("Query result:", result);
     return result;
   } catch (error) {
