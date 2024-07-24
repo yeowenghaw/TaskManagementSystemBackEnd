@@ -3,13 +3,14 @@ const express = require("express");
 const app = express();
 const dotenv = require("dotenv");
 var bodyParser = require("body-parser");
+const useragent = require("express-useragent");
 
 // config.env file variables
 // show the path that stores our config variables
 dotenv.config({ path: "./config/config.env" });
 
 app.use(bodyParser.json());
-
+app.use(useragent.express());
 // need to import the routes that we are using
 const users = require("./routes/users");
 

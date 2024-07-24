@@ -1,5 +1,16 @@
-var bcrypt = require("bcryptjs");
-const connectDatabase = require("../config/database");
+const bcrypt = require("bcryptjs");
+const connectDatabase = require("../utils/database");
+
+const { verifyToken, generateToken } = require("../utils/jwdttoken");
+
+const jwt = require("jsonwebtoken");
+const dotenv = require("dotenv");
+
+// const useragent = require("express-useragent");
+
+// config.env file variables
+// show the path that stores our config variables
+dotenv.config({ path: "./config/config.env" });
 
 // GET
 // /api/v1/users
@@ -26,23 +37,38 @@ exports.getUsers = async (req, res, next) => {
 // parameters for create user, username, password, email, disabled, groups
 exports.createUser = async (req, res, next) => {
   try {
-    const requestdata = await req.body;
+    if (await verifyToken(req)) {
+      console.log("SUCCESS: Connected to protected route");
+      const requestdata = await req.body;
 
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(requestdata.password, 10);
+      // Hash the password
+      const hashedPassword = await bcrypt.hash(requestdata.password, 10);
 
-    // Prepare the statement (use parameterized query to avoid SQL injection)
-    const statement = `INSERT INTO user (username, password, email, disabled) VALUES (?, ?, ?, ?)`;
-    const params = [requestdata.username, hashedPassword, requestdata.email, Number(requestdata.disabled)];
+      // Prepare the statement (use parameterized query to avoid SQL injection)
+      const statement = `INSERT INTO user (username, password, email, disabled) VALUES (?, ?, ?, ?)`;
+      const params = [requestdata.username, hashedPassword, requestdata.email, Number(requestdata.disabled)];
 
-    const result = await connectDatabase(statement, params);
+      const result = await connectDatabase(statement, params);
 
-    // NEED TO HAVE SECOND STATEMENT FOR GROUP, INCOMPLETE
+      // NEED TO HAVE SECOND STATEMENT FOR GROUP, INCOMPLETE
 
-    res.status(200).json({
-      success: true,
-      data: result
-    });
+      if (result.affectedRows == 1) {
+        res.status(200).json({
+          success: true,
+          message: "username: " + requestdata.username + " successfully created"
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          data: error
+        });
+      }
+    } else {
+      res.status(401).json({
+        success: false,
+        error: "Could not verify token, please log in again"
+      });
+    }
   } catch (error) {
     // catch any other error
     console.error("Error:", error);
@@ -105,17 +131,15 @@ exports.authenticateUsers = async (req, res, next) => {
     }
     // success, need to return a jwdt token details here, username, starttime, IP, browser tag, mac address.
     else {
-      // return the jwdt token data here,
-      const token_details = {
-        username: user.username,
-        starttime: "to be filled",
-        ip: "to be filled",
-        browsertag: "to be filled",
-        macaddress: "to be filled"
+      const jwdttoken = await generateToken(user.username, req);
+      const options = {
+        Expires: new Date(Date.now() + parseInt(process.env.COOKIE_EXPIRES_TIME) * 60 * 60 * 1000),
+        httpOnly: true
       };
-      res.status(200).json({
-        success: true,
-        data: token_details
+
+      // only data being sent back, is a token which is attatched as a cookie
+      res.status(200).cookie("token", jwdttoken, options).json({
+        success: true
       });
     }
   } catch (error) {

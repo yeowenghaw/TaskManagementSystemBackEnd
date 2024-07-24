@@ -5,15 +5,24 @@ node index.js
 Node JS is the platform but Express is the framework
 
 packages needed
-npm install express
+npm install express --save
   express is the framework we are using
-npm install dotenv
+npm install dotenv --save
 https://www.npmjs.com/package/dotenv
   loads environment variables from a .env file, so that environment variables are seperate from code
-npm install mysql2
+npm install mysql2 --save
 https://www.npmjs.com/package/mysql2
 https://sidorares.github.io/node-mysql2/docs
 	mysql2 is secure and faster over MySQL npm library, check sources for more information
+npm install bcryptjs --save
+https://www.npmjs.com/package/bcryptjs
+	password encryption so that if database compromised, hackers wont be able to steal passwords
+npm install jsonwebtoken --save
+https://www.npmjs.com/package/jsonwebtoken
+	jsonwebtoken is for more validation
+npm install express-useragent --save
+https://www.npmjs.com/package/express-useragent
+	express user agent is used for being able to extract the browser information from request so that we can add that information into our cookies for verifying sessions
 
 use routes overhere to implement the rest api(?), so frontend will make calls here which will then make calls to the database
 
