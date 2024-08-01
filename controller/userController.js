@@ -13,24 +13,25 @@ exports.createUser = async (req, res, next) => {
       console.log("SUCCESS: Connected to protected route");
       const requestdata = await req.body;
 
-      const username = requestdata.username.toLowerCase();
-      const password = requestdata.password;
-      const email = requestdata.email.toLowerCase();
-      // converting true false to equilivent 0 1 that is stored in the sql server
-      const disabled = requestdata.disabled !== false ? 1 : 0;
-      const group = requestdata.groups;
-
       //before testing anything, make sure that username, password, email is valid if not valid send back errorcode 400, Bad Request Code
 
       let errorstring = "";
-      errorstring += (await verifyUsername(username)) + (await verifyPassword(password)) + (await verifyEmail(email)) + (await checkIfGroupsExist(group));
+      errorstring += (await verifyUsername(requestdata.username)) + (await verifyPassword(requestdata.password)) + (await verifyEmail(requestdata.email)) + (await checkIfGroupsExist(requestdata.groups));
 
       if (errorstring.length > 0) {
         res.status(400).json({
           success: false,
           message: errorstring
         });
+        return;
       }
+
+      const username = requestdata.username.toLowerCase();
+      const password = requestdata.password;
+      const email = requestdata.email.toLowerCase();
+      // converting true false to equilivent 0 1 that is stored in the sql server
+      const disabled = requestdata.disabled !== false ? 1 : 0;
+      const group = requestdata.groups;
 
       // Hash the password
       const hashedPassword = await bcrypt.hash(password, 10);

@@ -29,6 +29,7 @@ exports.createGroup = async (req, res, next) => {
           success: false,
           message: errorstring
         });
+        return;
       }
 
       const statement = `INSERT INTO usergroup ( groupname, username) VALUES ( ?, ?)`;

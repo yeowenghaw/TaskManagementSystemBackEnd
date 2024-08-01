@@ -54,30 +54,34 @@ const checkGroup = async (group, user) => {
 // Username can be alphanumeric and can contain the special character underscore "_"
 const verifyUsername = async username => {
   let errorstring = "";
-  // Check if the username length is within the required range
-  if (username.length < 4 || username.length > 20) {
-    errorstring += " Username is not between 4 to 20 characters";
-  }
 
-  // Check if the username contains only alphanumeric characters and underscores
-  const validUsernamePattern = /^[a-zA-Z0-9_]+$/;
-  if (!validUsernamePattern.test(username)) {
-    errorstring += " Username can contains only alphanumeric characters or underscores";
-  }
-
-  const usernamestatement = `SELECT user.username FROM user WHERE user.username = ?`;
-  const usernameparams = [username];
-  try {
-    const usernameresult = await connectDatabase(usernamestatement, usernameparams);
-
-    // Assuming the database returns an array with the result
-    if (usernameresult[0].count > 0) {
-      errorString += " Username already exists in the database";
+  if (username) {
+    // Check if the username length is within the required range
+    if (username.length < 4 || username.length > 20) {
+      errorstring += " Username is not between 4 to 20 characters";
     }
-  } catch (error) {
-    // Handle any errors that occur during the database query
-    errorString += " An error occurred while checking the username. ";
-    console.error("Database error:", error);
+
+    // Check if the username contains only alphanumeric characters and underscores
+    const validUsernamePattern = /^[a-zA-Z0-9_]+$/;
+    if (!validUsernamePattern.test(username)) {
+      errorstring += " Username can contains only alphanumeric characters or underscores";
+    }
+
+    const usernamestatement = `SELECT user.username FROM user WHERE user.username = ?`;
+    const usernameparams = [username];
+    try {
+      const usernameresult = await connectDatabase(usernamestatement, usernameparams);
+      // Assuming the database returns an array with the result
+      if (usernameresult.length > 0) {
+        errorstring += " Username already exists in the database";
+      }
+    } catch (error) {
+      // Handle any errors that occur during the database query
+      errorstring += " An error occurred while checking the username. ";
+      console.error("Database error:", error);
+    }
+  } else {
+    return " Username is empty! ";
   }
 
   return errorstring;
@@ -88,15 +92,19 @@ const verifyUsername = async username => {
 // Password must contain alphanumeric
 const verifyPassword = async password => {
   let errorstring = "";
-  // Check if the password length is within the required range
-  if (password.length < 8 || password.length > 10) {
-    errorstring += " Password is not between 8 to 10 characters";
-  }
+  if (password) {
+    // Check if the password length is within the required range
+    if (password.length < 8 || password.length > 10) {
+      errorstring += " Password is not between 8 to 10 characters";
+    }
 
-  // Check if the password contains at least one special character
-  const specialCharPattern = /[!@#$%^&*(),.?":{}|<>]/;
-  if (!specialCharPattern.test(password)) {
-    errorstring += " Password must contain atleast 1 special character";
+    // Check if the password contains at least one special character
+    const specialCharPattern = /[!@#$%^&*(),.?":{}|<>]/;
+    if (!specialCharPattern.test(password)) {
+      errorstring += " Password must contain atleast 1 special character";
+    }
+  } else {
+    return " Password is empty! ";
   }
 
   return errorstring;
@@ -105,8 +113,9 @@ const verifyPassword = async password => {
 // Email cannot be empty
 const verifyEmail = async email => {
   let errorstring = "";
+  console.log("value of email: " + email);
   // Check if the password length is within the required range
-  if (email.length === 0) {
+  if (!email || email.length === 0) {
     errorstring += " Email cannot be empty";
   }
   return errorstring;
