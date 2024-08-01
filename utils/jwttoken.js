@@ -6,7 +6,13 @@ const jwt = require("jsonwebtoken");
 dotenv.config({ path: "./config/config.env" });
 
 const verifyToken = async token => {
-  return jwt.verify(token, process.env.JWT_SECRET);
+  let success = false;
+  try {
+    success = await jwt.verify(token, process.env.JWT_SECRET);
+  } catch (error) {
+    return false;
+  }
+  return success;
 };
 
 const generateToken = async (user, req) => {

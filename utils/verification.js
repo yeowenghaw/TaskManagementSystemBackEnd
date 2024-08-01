@@ -103,6 +103,18 @@ const verifyPassword = async password => {
     if (!specialCharPattern.test(password)) {
       errorstring += " Password must contain atleast 1 special character";
     }
+
+    // Check if the password contains at least one alphabet character
+    const alphabetPattern = /[a-zA-Z]/;
+    if (!alphabetPattern.test(password)) {
+      errorstring += " Password must contain at least 1 alphabet character.";
+    }
+
+    // Check if the password contains at least one numeric digit
+    const numberPattern = /\d/;
+    if (!numberPattern.test(password)) {
+      errorstring += " Password must contain at least 1 numeric digit.";
+    }
   } else {
     return " Password is empty! ";
   }
@@ -124,6 +136,25 @@ const verifyEmail = async email => {
 // 2 group verfications, one for creating a new group and the other for checking if a group exist within the table
 const verifyGroup = async groupName => {
   let errorstring = "";
+
+  try {
+    const statement = "SELECT DISTINCT groupname FROM usergroup";
+    const result = await connectDatabase(statement);
+
+    // Extract group names from the result
+    const GroupNames = result.map(row => row.groupname);
+
+    if (GroupNames.includes(groupName)) {
+      errorstring += " group name already exist!";
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(400).json({
+      success: false,
+      message: error
+    });
+  }
+
   // Check if the group name length is within the required range
   if (groupName.length < 4 || groupName.length > 20) {
     errorstring += " groupname is not between 4 to 20 characters";

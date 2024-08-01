@@ -10,7 +10,7 @@ const { verifyUser, verifyAdmin, verifyUsername, verifyPassword, checkIfGroupsEx
 exports.createUser = async (req, res, next) => {
   try {
     if ((await verifyUser(req)) || (await verifyAdmin(req))) {
-      console.log("SUCCESS: Connected to protected route");
+      //console.log("SUCCESS: Connected to protected route");
       const requestdata = await req.body;
 
       //before testing anything, make sure that username, password, email is valid if not valid send back errorcode 400, Bad Request Code
@@ -162,40 +162,74 @@ exports.updateUserProfile = async (req, res, next) => {
       const password = requestdata.password;
       const email = requestdata.email.toLowerCase();
 
-      let errorstring = "";
-      errorstring += (await verifyPassword(password)) + (await verifyEmail(email));
-      if (errorstring.length > 0) {
-        console.log("Error Detected: " + errorstring);
-        res.status(400).json({
-          success: false,
-          message: errorstring
-        });
-        return;
-      }
+      //console.log(password);
 
       // decoding token attatched to determine user
       decodedtokenobject = await decodeToken(req);
       const username = decodedtokenobject.username;
 
-      // Hash the password
-      const hashedPassword = await bcrypt.hash(password, 10);
+      if (password) {
+        let errorstring = "";
+        errorstring += (await verifyPassword(password)) + (await verifyEmail(email));
+        if (errorstring.length > 0) {
+          console.log("Error Detected: " + errorstring);
+          res.status(400).json({
+            success: false,
+            message: errorstring
+          });
+          return;
+        }
 
-      const statement = `UPDATE user SET password = ?, email = ? WHERE username = ?`;
-      const params = [hashedPassword, email, username];
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-      const result = await connectDatabase(statement, params);
+        const statement = `UPDATE user SET password = ?, email = ? WHERE username = ?`;
+        const params = [hashedPassword, email, username];
 
-      // first point of failure, no updates were made, likely user does not exist
-      if (result.affectedRows != 1) {
-        console.log("result.affectedRows not equal 1" + result.affectedRows);
-        res.status(400).json({
-          success: false,
-          message: "Username does not exist"
-        });
-        return;
+        const result = await connectDatabase(statement, params);
+
+        // first point of failure, no updates were made, likely user does not exist
+        if (result.affectedRows !== 1) {
+          console.log("result.affectedRows not equal 1" + result.affectedRows);
+          res.status(400).json({
+            success: false,
+            message: "Username does not exist"
+          });
+          return;
+        }
+      } else {
+        let errorstring = "";
+        errorstring += await verifyEmail(email);
+        if (errorstring.length > 0) {
+          console.log("Error Detected: " + errorstring);
+          res.status(400).json({
+            success: false,
+            message: errorstring
+          });
+          return;
+        }
+
+        // decoding token attatched to determine user
+        decodedtokenobject = await decodeToken(req);
+        const username = decodedtokenobject.username;
+
+        const statement = `UPDATE user SET email = ? WHERE username = ?`;
+        const params = [email, username];
+
+        const result = await connectDatabase(statement, params);
+
+        // first point of failure, no updates were made, likely user does not exist
+        if (result.affectedRows !== 1) {
+          console.log("result.affectedRows not equal 1" + result.affectedRows);
+          res.status(400).json({
+            success: false,
+            message: "Username does not exist"
+          });
+          return;
+        }
       }
 
-      console.log("successfully updated user: " + username + ", changing password to: " + password + ", changing email to: " + email);
+      //console.log("successfully updated user: " + username + ", changing password to: " + password + ", changing email to: " + email);
       res.status(200).json({
         success: true,
         message: username + "'s email and password has successfully updated"
@@ -233,54 +267,65 @@ exports.updateUser = async (req, res, next) => {
       const disabled = requestdata.disabled !== false ? 1 : 0;
       const group = requestdata.groups;
 
-      // console.log("original information given");
-      // console.log({
-      //   username: requestdata.username,
-      //   password: requestdata.password,
-      //   email: requestdata.email,
-      //   disabled: requestdata.disabled,
-      //   group: requestdata.groups
-      // });
-
-      // console.log("parsed information information given");
-      // console.log({
-      //   username: username,
-      //   password: password,
-      //   email: email,
-      //   disabled: disabled,
-      //   group: group
-      // });
-
       // no one can edit the admin's groups and status
       if (username === "admin") {
         let errorstring = "";
-        errorstring += (await verifyPassword(password)) + (await verifyEmail(email));
 
-        if (errorstring.length > 0) {
-          console.log("Error: " + errorstring);
-          res.status(400).json({
-            success: false,
-            message: errorstring
-          });
-          return;
-        }
+        if (password) {
+          errorstring += (await verifyPassword(password)) + (await verifyEmail(email));
 
-        // Hash the password
-        const hashedPassword = await bcrypt.hash(password, 10);
+          if (errorstring.length > 0) {
+            console.log("Error: " + errorstring);
+            res.status(400).json({
+              success: false,
+              message: errorstring
+            });
+            return;
+          }
 
-        const statement = `UPDATE user SET password = ?,email = ? WHERE user.username = ?`;
-        const params = [hashedPassword, email, username];
+          // Hash the password
+          const hashedPassword = await bcrypt.hash(password, 10);
 
-        const result = await connectDatabase(statement, params);
+          const statement = `UPDATE user SET password = ?,email = ? WHERE user.username = ?`;
+          const params = [hashedPassword, email, username];
 
-        // first point of failure, no updates were made, likely user does not exist
-        if (result.affectedRows != 1) {
-          console.log("result.affectedRows not equal " + result.affectedRows);
-          res.status(400).json({
-            success: false,
-            message: "Username does not exist"
-          });
-          return;
+          const result = await connectDatabase(statement, params);
+
+          // first point of failure, no updates were made, likely user does not exist
+          if (result.affectedRows != 1) {
+            console.log("result.affectedRows not equal " + result.affectedRows);
+            res.status(400).json({
+              success: false,
+              message: "Username does not exist"
+            });
+            return;
+          }
+        } else {
+          errorstring += await verifyEmail(email);
+
+          if (errorstring.length > 0) {
+            console.log("Error: " + errorstring);
+            res.status(400).json({
+              success: false,
+              message: errorstring
+            });
+            return;
+          }
+
+          const statement = `UPDATE user SET email = ? WHERE user.username = ?`;
+          const params = [email, username];
+
+          const result = await connectDatabase(statement, params);
+
+          // first point of failure, no updates were made, likely user does not exist
+          if (result.affectedRows != 1) {
+            console.log("result.affectedRows not equal " + result.affectedRows);
+            res.status(400).json({
+              success: false,
+              message: "Username does not exist"
+            });
+            return;
+          }
         }
         console.log("successfully updated user: " + username);
         //console.log(requestdata);
@@ -291,33 +336,62 @@ exports.updateUser = async (req, res, next) => {
       } else {
         //before testing anything, make sure that username, password, email is valid if not valid send back errorcode 400, Bad Request Code
         let errorstring = "";
-        errorstring += (await verifyPassword(password)) + (await verifyEmail(email)) + (await checkIfGroupsExist(group));
 
-        if (errorstring.length > 0) {
-          console.log("Error: " + errorstring);
-          res.status(400).json({
-            success: false,
-            message: errorstring
-          });
-          return;
-        }
+        if (password) {
+          errorstring += (await verifyPassword(password)) + (await verifyEmail(email)) + (await checkIfGroupsExist(group));
 
-        // Hash the password
-        const hashedPassword = await bcrypt.hash(password, 10);
+          if (errorstring.length > 0) {
+            console.log("Error: " + errorstring);
+            res.status(400).json({
+              success: false,
+              message: errorstring
+            });
+            return;
+          }
 
-        const statement = `UPDATE user SET password = ?,email = ?,disabled =?  WHERE username = ?`;
-        const params = [hashedPassword, email, disabled, username];
+          // Hash the password
+          const hashedPassword = await bcrypt.hash(password, 10);
 
-        const result = await connectDatabase(statement, params);
+          const statement = `UPDATE user SET password = ?,email = ?,disabled =?  WHERE username = ?`;
+          const params = [hashedPassword, email, disabled, username];
 
-        // first point of failure, no updates were made, likely user does not exist
-        if (result.affectedRows != 1) {
-          console.log("result.affectedRows not equal 1" + result.affectedRows);
-          res.status(400).json({
-            success: false,
-            message: "Username does not exist"
-          });
-          return;
+          const result = await connectDatabase(statement, params);
+
+          // first point of failure, no updates were made, likely user does not exist
+          if (result.affectedRows != 1) {
+            console.log("result.affectedRows not equal 1" + result.affectedRows);
+            res.status(400).json({
+              success: false,
+              message: "Username does not exist"
+            });
+            return;
+          }
+        } else {
+          errorstring += (await verifyEmail(email)) + (await checkIfGroupsExist(group));
+
+          if (errorstring.length > 0) {
+            console.log("Error: " + errorstring);
+            res.status(400).json({
+              success: false,
+              message: errorstring
+            });
+            return;
+          }
+
+          const statement = `UPDATE user SET email = ?,disabled =?  WHERE username = ?`;
+          const params = [email, disabled, username];
+
+          const result = await connectDatabase(statement, params);
+
+          // first point of failure, no updates were made, likely user does not exist
+          if (result.affectedRows != 1) {
+            console.log("result.affectedRows not equal 1" + result.affectedRows);
+            res.status(400).json({
+              success: false,
+              message: "Username does not exist"
+            });
+            return;
+          }
         }
 
         // deleting all group entries current user is in

@@ -49,9 +49,9 @@ const connectDatabase = async (statement, param) => {
 
     // Execute statement and return result
     const sql = statement;
-    console.log("Executing statement:", statement);
+    //console.log("Executing statement:", statement);
     const result = await queryPromise(sql, param);
-    console.log("Query result:", result);
+    //console.log("Query result:", result);
     return result;
   } catch (error) {
     throw error; // Rethrow the error to be handled by the caller

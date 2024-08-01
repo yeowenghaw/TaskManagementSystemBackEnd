@@ -1,10 +1,9 @@
-const bcrypt = require("bcryptjs");
 const connectDatabase = require("../utils/database");
 
 const { verifyUser, verifyAdmin, verifyGroup } = require("../utils/verification");
 
 const dotenv = require("dotenv");
-const { request } = require("express");
+
 
 // const useragent = require("express-useragent");
 
