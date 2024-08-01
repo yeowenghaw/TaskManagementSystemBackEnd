@@ -46,7 +46,7 @@ const checkGroup = async (group, user) => {
   const params = [group, user];
 
   const result = await connectDatabase(statement, params);
-  return result.affectedRows === 1;
+  return result.length === 1;
 };
 
 // Username length must be >= 4 and <= 20 characters

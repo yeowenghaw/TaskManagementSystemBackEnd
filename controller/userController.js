@@ -58,9 +58,7 @@ exports.createUser = async (req, res, next) => {
           message: error
         });
       }
-    }
-    else
-    {
+    } else {
       res.status(401).json({
         success: false,
         message: error
@@ -233,6 +231,24 @@ exports.updateUser = async (req, res, next) => {
       // converting true false to equilivent 0 1 that is stored in the sql server
       const disabled = requestdata.disabled !== false ? 1 : 0;
       const group = requestdata.groups;
+
+      // console.log("original information given");
+      // console.log({
+      //   username: requestdata.username,
+      //   password: requestdata.password,
+      //   email: requestdata.email,
+      //   disabled: requestdata.disabled,
+      //   group: requestdata.groups
+      // });
+
+      // console.log("parsed information information given");
+      // console.log({
+      //   username: username,
+      //   password: password,
+      //   email: email,
+      //   disabled: disabled,
+      //   group: group
+      // });
 
       // no one can edit the admin's groups and status
       if (username === "admin") {
