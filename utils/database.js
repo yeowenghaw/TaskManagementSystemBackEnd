@@ -8,6 +8,7 @@ dotenv.config({ path: "./config/config.env" });
 // Function to connect to database and execute statement asynchronously
 const connectDatabase = async (statement, param) => {
   // Create MySQL connection
+
   const con = mysql.createConnection({
     host: process.env.HOST,
     user: process.env.USER,

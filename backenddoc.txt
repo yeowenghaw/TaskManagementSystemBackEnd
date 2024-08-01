@@ -23,6 +23,11 @@ https://www.npmjs.com/package/jsonwebtoken
 npm install express-useragent --save
 https://www.npmjs.com/package/express-useragent
 	express user agent is used for being able to extract the browser information from request so that we can add that information into our cookies for verifying sessions
+npm install cors --save
+https://dev.to/speaklouder/how-to-configure-cors-in-nodejs-with-express-11h
+npm install cookie-parser --save
+https://www.npmjs.com/package/cookie-parser
+
 
 use routes overhere to implement the rest api(?), so frontend will make calls here which will then make calls to the database
 

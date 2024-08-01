@@ -1,58 +1,53 @@
 const bcrypt = require("bcryptjs");
 const connectDatabase = require("../utils/database");
 
-const { verifyToken, generateToken } = require("../utils/jwdttoken");
+const { decodeToken } = require("../utils/jwttoken");
+const { verifyUser, verifyAdmin, verifyUsername, verifyPassword, checkIfGroupsExist, verifyEmail } = require("../utils/verification");
 
-const jwt = require("jsonwebtoken");
-const dotenv = require("dotenv");
-
-// const useragent = require("express-useragent");
-
-// config.env file variables
-// show the path that stores our config variables
-dotenv.config({ path: "./config/config.env" });
-
-// GET
-// /api/v1/users
-exports.getUsers = async (req, res, next) => {
-  try {
-    const statement = "SELECT user.id, user.username, user.email, user.disabled FROM user";
-    const result = await connectDatabase(statement);
-    res.status(200).json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    console.error("Error:", error);
-    res.status(400).json({
-      success: false,
-      data: error
-    });
-  }
-};
-
-// GROUP NOT IMPLEMENTED YET, NOT FINISHED
 // POST
 // /api/v1/users
-// parameters for create user, username, password, email, disabled, groups
+// this api call is to be used in the user management page
 exports.createUser = async (req, res, next) => {
   try {
-    if (await verifyToken(req)) {
+    if ((await verifyUser(req)) || (await verifyAdmin(req))) {
       console.log("SUCCESS: Connected to protected route");
       const requestdata = await req.body;
 
-      // Hash the password
-      const hashedPassword = await bcrypt.hash(requestdata.password, 10);
+      const username = requestdata.username.toLowerCase();
+      const password = requestdata.password;
+      const email = requestdata.email.toLowerCase();
+      // converting true false to equilivent 0 1 that is stored in the sql server
+      const disabled = requestdata.disabled !== false ? 1 : 0;
+      const group = requestdata.groups;
 
-      // Prepare the statement (use parameterized query to avoid SQL injection)
+      //before testing anything, make sure that username, password, email is valid if not valid send back errorcode 400, Bad Request Code
+
+      let errorstring = "";
+      errorstring += (await verifyUsername(username)) + (await verifyPassword(password)) + (await verifyEmail(email)) + (await checkIfGroupsExist(group));
+
+      if (errorstring.length > 0) {
+        res.status(400).json({
+          success: false,
+          message: errorstring
+        });
+      }
+
+      // Hash the password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
       const statement = `INSERT INTO user (username, password, email, disabled) VALUES (?, ?, ?, ?)`;
-      const params = [requestdata.username, hashedPassword, requestdata.email, Number(requestdata.disabled)];
+      const params = [username, hashedPassword, email, disabled];
 
       const result = await connectDatabase(statement, params);
 
-      // NEED TO HAVE SECOND STATEMENT FOR GROUP, INCOMPLETE
-
-      if (result.affectedRows == 1) {
+      // successful creation, now create the groups inside the database
+      if (result.affectedRows === 1) {
+        //
+        group.forEach(async element => {
+          const groupstatement = `INSERT INTO usergroup ( groupname, username) VALUES ( ?, ?)`;
+          const groupparams = [element, requestdata.username];
+          const groupresults = await connectDatabase(groupstatement, groupparams);
+        });
         res.status(200).json({
           success: true,
           message: "username: " + requestdata.username + " successfully created"
@@ -60,13 +55,15 @@ exports.createUser = async (req, res, next) => {
       } else {
         res.status(400).json({
           success: false,
-          data: error
+          message: error
         });
       }
-    } else {
+    }
+    else
+    {
       res.status(401).json({
         success: false,
-        error: "Could not verify token, please log in again"
+        message: error
       });
     }
   } catch (error) {
@@ -74,80 +71,270 @@ exports.createUser = async (req, res, next) => {
     console.error("Error:", error);
     res.status(400).json({
       success: false,
-      data: error
+      message: error
     });
   }
 };
 
-// POST
-// /api/v1/users/login
-exports.authenticateUsers = async (req, res, next) => {
+// GET
+// /api/v1/users
+// svelte server needs to access this
+// this api call is to be used in the user management page
+exports.getUsers = async (req, res, next) => {
+  console.log("Getting All Users");
   try {
-    const requestdata = await req.body;
-    // edge case, should never happen, request body has no information or lacks username or password
-    if (!req.body || !req.body.username || !req.body.password) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing username or password"
+    if (await verifyUser(req)) {
+      const statement = "SELECT user.username, user.email, user.disabled FROM user";
+      const result = await connectDatabase(statement);
+
+      result.forEach(element => {
+        console.log("Username: " + element.username + ", Email: " + element.email + ", Disabled: " + element.disabled);
       });
-    }
 
-    const username = requestdata.username;
-    const password = requestdata.password;
-
-    // Prepare the statement (use parameterized query to avoid SQL injection)
-    const statement = `SELECT * FROM user WHERE user.username = ?`;
-    const params = [requestdata.username];
-
-    const result = await connectDatabase(statement, params);
-
-    // first point of failure, username does not exist in database
-    if (Object.values(result).length != 1) {
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+    } else {
       res.status(401).json({
         success: false,
-        error: "Username does not exist"
-      });
-    }
-
-    // Verify password
-    const user = result[0];
-    const passwordMatch = await bcrypt.compare(password, user.password);
-
-    console.log("checking password matching: " + passwordMatch);
-
-    // second point of failure, password is incorrect
-    if (!passwordMatch) {
-      res.status(401).json({
-        success: false,
-        error: "Password provided is incorrect"
-      });
-    }
-    // third point of failure, user is disabled
-    else if (result.disabled == true) {
-      res.status(401).json({
-        success: false,
-        error: "User is currently disabled, please contact admin"
-      });
-    }
-    // success, need to return a jwdt token details here, username, starttime, IP, browser tag, mac address.
-    else {
-      const jwdttoken = await generateToken(user.username, req);
-      const options = {
-        Expires: new Date(Date.now() + parseInt(process.env.COOKIE_EXPIRES_TIME) * 60 * 60 * 1000),
-        httpOnly: true
-      };
-
-      // only data being sent back, is a token which is attatched as a cookie
-      res.status(200).cookie("token", jwdttoken, options).json({
-        success: true
+        message: "Could not verify token, please log in again"
       });
     }
   } catch (error) {
-    // catch any other error
     console.error("Error:", error);
     res.status(400).json({
       success: false,
-      data: error
+      message: error
+    });
+  }
+};
+
+// GET
+// /api/v1/users/user/:username
+// svelte server needs to access this
+// this api call is to be used in the profile page
+exports.getUser = async (req, res, next) => {
+  console.log("Getting User");
+  try {
+    if (await verifyUser(req)) {
+      const userusername = req.params.username;
+      const statement = `SELECT user.username, user.email, user.disabled FROM user WHERE user.username = ?`;
+      const params = [userusername];
+      const result = await connectDatabase(statement, params);
+      if (result.length === 1) {
+        console.log("Successfully got Username:" + result[0].username + " Email:" + result[0].email + " Disabled:" + result[0].disabled);
+        res.status(200).json({
+          success: true,
+          data: result
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: "User not found"
+        });
+      }
+    } else {
+      // log out unverified users
+      res.status(401).json({
+        success: false,
+        message: "Could not verify token, please log in again"
+      });
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(400).json({
+      success: false,
+      message: error
+    });
+  }
+};
+
+// PUT
+// /api/v1/users/profile
+// this api call is to be used in the profile page
+exports.updateUserProfile = async (req, res, next) => {
+  console.log("Updating Password");
+  try {
+    if (await verifyUser(req)) {
+      // acquiring data sent in request
+      const requestdata = await req.body;
+
+      const password = requestdata.password;
+      const email = requestdata.email.toLowerCase();
+
+      let errorstring = "";
+      errorstring += (await verifyPassword(password)) + (await verifyEmail(email));
+      if (errorstring.length > 0) {
+        console.log("Error Detected: " + errorstring);
+        res.status(400).json({
+          success: false,
+          message: errorstring
+        });
+        return;
+      }
+
+      // decoding token attatched to determine user
+      decodedtokenobject = await decodeToken(req);
+      const username = decodedtokenobject.username;
+
+      // Hash the password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const statement = `UPDATE user SET password = ?, email = ? WHERE username = ?`;
+      const params = [hashedPassword, email, username];
+
+      const result = await connectDatabase(statement, params);
+
+      // first point of failure, no updates were made, likely user does not exist
+      if (result.affectedRows != 1) {
+        console.log("result.affectedRows not equal 1" + result.affectedRows);
+        res.status(400).json({
+          success: false,
+          message: "Username does not exist"
+        });
+        return;
+      }
+
+      console.log("successfully updated user: " + username + ", changing password to: " + password + ", changing email to: " + email);
+      res.status(200).json({
+        success: true,
+        message: username + "'s email and password has successfully updated"
+      });
+    } else {
+      console.log("token not verified for password");
+      res.status(401).json({
+        success: false,
+        message: "Could not verify token, please log in again"
+      });
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(400).json({
+      success: false,
+      message: error
+    });
+  }
+};
+
+// PUT
+// /api/v1/users/
+// this api call is to be used in the usermanagement page, updates everything
+exports.updateUser = async (req, res, next) => {
+  console.log("Updating User");
+  try {
+    if ((await verifyUser(req)) && (await verifyAdmin(req))) {
+      // acquiring data sent in request
+      const requestdata = await req.body;
+
+      const username = requestdata.username.toLowerCase();
+      const password = requestdata.password;
+      const email = requestdata.email.toLowerCase();
+      // converting true false to equilivent 0 1 that is stored in the sql server
+      const disabled = requestdata.disabled !== false ? 1 : 0;
+      const group = requestdata.groups;
+
+      // no one can edit the admin's groups and status
+      if (username === "admin") {
+        let errorstring = "";
+        errorstring += (await verifyPassword(password)) + (await verifyEmail(email));
+
+        if (errorstring.length > 0) {
+          console.log("Error: " + errorstring);
+          res.status(400).json({
+            success: false,
+            message: errorstring
+          });
+          return;
+        }
+
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const statement = `UPDATE user SET password = ?,email = ? WHERE user.username = ?`;
+        const params = [hashedPassword, email, username];
+
+        const result = await connectDatabase(statement, params);
+
+        // first point of failure, no updates were made, likely user does not exist
+        if (result.affectedRows != 1) {
+          console.log("result.affectedRows not equal " + result.affectedRows);
+          res.status(400).json({
+            success: false,
+            message: "Username does not exist"
+          });
+          return;
+        }
+        console.log("successfully updated user: " + username);
+        //console.log(requestdata);
+        res.status(200).json({
+          success: true,
+          message: username + " has been successfully updated"
+        });
+      } else {
+        //before testing anything, make sure that username, password, email is valid if not valid send back errorcode 400, Bad Request Code
+        let errorstring = "";
+        errorstring += (await verifyPassword(password)) + (await verifyEmail(email)) + (await checkIfGroupsExist(group));
+
+        if (errorstring.length > 0) {
+          console.log("Error: " + errorstring);
+          res.status(400).json({
+            success: false,
+            message: errorstring
+          });
+          return;
+        }
+
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const statement = `UPDATE user SET password = ?,email = ?,disabled =?  WHERE username = ?`;
+        const params = [hashedPassword, email, disabled, username];
+
+        const result = await connectDatabase(statement, params);
+
+        // first point of failure, no updates were made, likely user does not exist
+        if (result.affectedRows != 1) {
+          console.log("result.affectedRows not equal 1" + result.affectedRows);
+          res.status(400).json({
+            success: false,
+            message: "Username does not exist"
+          });
+          return;
+        }
+
+        // deleting all group entries current user is in
+        const deletegroupstatement = `DELETE FROM usergroup where username =? `;
+        const deletegroupparams = [requestdata.username];
+        const deletgroupresult = await connectDatabase(deletegroupstatement, deletegroupparams);
+
+        //inserting groups
+        requestdata.groups.forEach(async element => {
+          const groupstatement = `INSERT INTO usergroup (groupname, username) VALUES (?, ?)`;
+          const groupparams = [element, username];
+
+          const groupresult = await connectDatabase(groupstatement, groupparams);
+        });
+
+        console.log("successfully updated user: " + username);
+        //console.log(requestdata);
+        res.status(200).json({
+          success: true,
+          message: username + " has been successfully updated"
+        });
+      }
+    } else {
+      console.log("token not verified for password");
+      res.status(401).json({
+        success: false,
+        message: "Could not verify token, please log in again"
+      });
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(400).json({
+      success: false,
+      message: error
     });
   }
 };
