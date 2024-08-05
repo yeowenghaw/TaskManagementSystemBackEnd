@@ -1,18 +1,17 @@
 const bcrypt = require("bcryptjs");
-const connectDatabase = require("../utils/database");
-
-const { generateToken } = require("../utils/jwttoken");
-const { verifyUser, verifyAdmin } = require("../utils/verification");
-
 const dotenv = require("dotenv");
+const jwt = require("jsonwebtoken");
 
 dotenv.config({ path: "./config/config.env" });
+
+const { getConnectionPool } = require("../config/database");
 
 // POST
 // /api/v1/login
 // this api call is to be used in the login page
 exports.authenticateUser = async (req, res, next) => {
   console.log("Authenticating User");
+  const pool = getConnectionPool();
   try {
     const requestdata = await req.body;
 
@@ -27,42 +26,61 @@ exports.authenticateUser = async (req, res, next) => {
     const username = requestdata.username;
     const password = requestdata.password;
 
-    const statement = `SELECT * FROM user WHERE user.username = ?`;
+    const statement = `SELECT user.username, user.password, user.disabled FROM user WHERE user.username = ?`;
     const params = [requestdata.username];
 
-    const result = await connectDatabase(statement, params);
+    const [result] = await pool.execute(statement, params);
+
+    // console.log(result);
 
     // first point of failure, username does not exist in database
     //console.log(result);
+    //console.log("value of result.length: " + result.length);
     if (result.length != 1) {
       res.status(401).json({
         success: false,
-        message: "Username does not exist"
+        message: "Invalid Log in Details"
       });
       return;
     }
 
     // Verify password
     const user = result[0];
+    //console.log("is user disabled?: " + result[0].disabled);
+
     const passwordMatch = await bcrypt.compare(password, user.password);
 
     // second point of failure, password is incorrect
     if (!passwordMatch) {
       res.status(401).json({
         success: false,
-        message: "Password provided is incorrect"
+        message: "Invalid Log in Details"
       });
+      return;
     }
     // third point of failure, user is disabled
     else if (result[0].disabled === 1) {
       res.status(401).json({
         success: false,
-        message: "User is currently disabled, please contact admin"
+        message: "User is currently disabled"
       });
+      return;
     }
     // success, need to return a jwt token details here, username, starttime, IP, browser tag, mac address.
     else {
-      const jwttoken = await generateToken(user.username, req);
+      const jwttoken = await jwt.sign(
+        {
+          username: user,
+          starttime: new Date(Date.now()),
+          ip: req.ip,
+          browsertag: req.useragent.browser,
+          macaddress: "to be filled"
+        },
+        process.env.JWT_SECRET,
+        {
+          expiresIn: process.env.JWT_EXPIRES_TIME
+        }
+      );
       const options = {
         Expires: new Date(Date.now() + parseInt(process.env.COOKIE_EXPIRES_TIME) * 60 * 60 * 1000),
         httpOnly: true
@@ -97,30 +115,21 @@ exports.logoutUser = async (req, res, next) => {
 };
 
 // POST
-// /api/v1/authenticate
-exports.checkAuthentication = async (req, res, next) => {
-  if (await verifyUser(req)) {
-    console.log("user is verified");
-    if (await verifyAdmin(req)) {
-      console.log("user is an admin");
-      res.status(200).json({
-        success: true,
-        message: "Authorized admin"
-      });
-    } else {
-      res.status(200).json({
-        success: true,
-        message: "Authorized user not admin"
-      });
-    }
-  }
-  // log out, because token is invalid or user is disabled
-  else {
-    console.log("user is unverified");
-    res.clearCookie("token");
-    res.status(400).json({
-      success: false,
-      message: "Unauthorized user"
-    });
-  }
+// /api/v1/user
+// empty call, just to make sure jwttoken is valid and user is not disabled
+exports.checkUser = async (req, res, next) => {
+  res.status(200).json({
+    success: true,
+    message: "Valid User"
+  });
+};
+
+// POST
+// /api/v1/admin
+// empty call, just as verify user and verify admin inside
+exports.checkAdmin = async (req, res, next) => {
+  res.status(200).json({
+    success: true,
+    message: "Authorized admin"
+  });
 };

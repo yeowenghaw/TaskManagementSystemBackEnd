@@ -1,6 +1,6 @@
 const dotenv = require("dotenv");
-const connectDatabase = require("../utils/database");
-const { verifyToken, generateToken, decodeToken, extractToken } = require("../utils/jwttoken");
+const { getConnectionPool } = require("../config/database");
+const jwt = require("jsonwebtoken");
 
 // config.env file variables
 // show the path that stores our config variables
@@ -8,190 +8,168 @@ dotenv.config({ path: "./config/config.env" });
 
 // basic user authentication to be called on every page except login
 // simple jwttoken check
-const verifyUser = async req => {
-  const cookieHeader = req.headers.cookie;
-  // checking for cookies
-  if (cookieHeader) {
-    const token = await extractToken(JSON.stringify(cookieHeader));
-    const verifiedtoken = await verifyToken(token);
-    const decodedtoken = await decodeToken(req);
-    // checking if the current user is disabled
-    const username = decodedtoken.username;
-    const statement = `SELECT user.disabled FROM user WHERE user.username = ?`;
-    const params = [username];
+const verifyUser = async (req, res, next) => {
+  //console.log("verifying user!");
+  const pool = getConnectionPool();
+  let errorstring = "";
+  // make a call to ensure that the user assessing the database is verified and is not disabled
+  let userisnotverified = true;
+  let userisdisabled = true;
+  let decodedTokenusername = "";
+  // acquire the cookie from the request headers
+  const cookies = req.headers.cookie;
+  // getting our connection pool that we will be using for this API call
 
-    const result = await connectDatabase(statement, params);
-    //console.log("result[0].disabled:" + result[0].disabled);
-    return decodedtoken && !result[0].disabled;
+  // check if there is even any cookie that is attatched to the header, will crash backend since we are using an undefined variable otherwise
+  if (cookies) {
+    //only when the cookie exist can we extract out the token which we will use to acquire the username of the user
+    // stringifying the cookie
+    const JSONCookieString = JSON.stringify(cookies);
+    ////console.log("RAW JWT as JSON: " + JSONCookieString);
+    // parsing out the extra information attatched to acquire the raw token
+    let tokenEndIndex = JSONCookieString.indexOf(";");
+    let tokenStartIndex = JSONCookieString.indexOf("=");
+    if (tokenStartIndex === -1) {
+      tokenStartIndex = 0;
+    }
+    if (tokenEndIndex === -1) {
+      tokenEndIndex = JSONCookieString.length - 1;
+    }
+    const token = JSONCookieString.slice(tokenStartIndex + 1, tokenEndIndex);
+    ////console.log("RAW JWT as JSON: " + token);
+    // verifying the legitamancy of the token...
+    ////console.log("Token value: " + token);
+    try {
+      // dont need the return value because if its legitimate it returns true otherwise it throws an error
+      const tokenverification = await jwt.verify(token, process.env.JWT_SECRET);
+      // //console.log(tokenverification);
+      // will only reach here if the user is verified
+      userisnotverified = false;
+      //console.log("Token is verified!");
+    } catch (error) {
+      //console.log(error);
+      errorstring += "JWT Token attatched cannot be verified! ";
+    }
+
+    // second user verification check, checking in database whether the use is disabled or not
+    // extracting out the username from the token we acquired...
+
+    try {
+      const decodedToken = await jwt.decode(token);
+      // //console.log("Decoded token value: " + JSON.stringify(decodedToken));
+      decodedTokenusername = decodedToken.username.username;
+      //console.log("Token is decoded!");
+    } catch (error) {
+      // theoratically should never reach here because the token is already verified, put here just incase
+      //console.log(error);
+      errorstring += "JWT Token attatched cannot be decoded! ";
+    }
+
+    // successfully acquired the username from the token we check the database to see if the user has been disabled
+    if (decodedTokenusername.length !== 0) {
+      const checkDisabledUserStatement = `SELECT user.disabled FROM user WHERE user.username = ?`;
+      const checkDisabledUserparams = [decodedTokenusername];
+      try {
+        const [checkDisabledUserresult] = await pool.execute(checkDisabledUserStatement, checkDisabledUserparams);
+        userisdisabled = checkDisabledUserresult[0].disabled;
+        if (!userisdisabled) {
+          userisdisabled = false;
+        } else {
+          errorstring += "User is disabled! ";
+        }
+      } catch (error) {
+        //console.log(error);
+        errorstring += "could not check if the user is disabled! ";
+      }
+    }
   } else {
-    return false;
+    errorstring += "could not find any cookies attatched to header! ";
+  }
+
+  // if either of this values are true, the user is not authorised so we return 401 not authorised, and the frontend should kick them out of the application
+  if (userisdisabled || userisnotverified) {
+    res.status(401).json({
+      success: false,
+      message: errorstring
+    });
+    return;
+  } else {
+    next();
   }
 };
 
 // admin user authentication to be called on usermanagement page
-// will decrypt the token for username, check whether the username is admin or is in the 'admins' group
-const verifyAdmin = async req => {
-  const decodedtoken = await decodeToken(req);
-  if (decodedtoken) {
-    const username = decodedtoken.username;
-    return (await checkGroup("admins", username)) || username === "admin";
+// will decrypt the token for username, check whether the username is admin or is in the '' group
+const verifyAdmin = async (req, res, next) => {
+  let errorstring = "";
+  let decodedTokenusername = "";
+  let userisadmin = false;
+
+  // acquire the cookie from the request headers
+  const cookies = req.headers.cookie;
+  // getting our connection pool that we will be using for this API call
+
+  // check if there is even any cookie that is attatched to the header, will crash backend since we are using an undefined variable otherwise
+  if (cookies) {
+    //only when the cookie exist can we extract out the token which we will use to acquire the username of the user
+    // stringifying the cookie
+    const JSONCookieString = JSON.stringify(cookies);
+    ////console.log("RAW JWT as JSON: " + JSONCookieString);
+    // parsing out the extra information attatched to acquire the raw token
+    let tokenEndIndex = JSONCookieString.indexOf(";");
+    let tokenStartIndex = JSONCookieString.indexOf("=");
+    if (tokenStartIndex === -1) {
+      tokenStartIndex = 0;
+    }
+    if (tokenEndIndex === -1) {
+      tokenEndIndex = JSONCookieString.length - 1;
+    }
+    const token = JSONCookieString.slice(tokenStartIndex + 1, tokenEndIndex);
+
+    // second user verification check, checking in database whether the use is disabled or not
+    // extracting out the username from the token we acquired...
+
+    try {
+      const decodedToken = await jwt.decode(token);
+      decodedTokenusername = decodedToken.username.username;
+    } catch (error) {
+      // theoratically should never reach here because the token is already verified, put here just incase
+      errorstring += "JWT Token attatched cannot be decoded! ";
+    }
+
+    // now checking if the user is an admin
+    // we want the logical negate of this because these statements prove that the user is an admin
+    if ((await checkGroup(decodedTokenusername, "admin")) || decodedTokenusername === "admin") {
+      //console.log("user is either named admin or is in admin group");
+      userisadmin = true;
+    } else {
+      errorstring += "user is not an Admin! ";
+    }
   } else {
-    return false;
+    errorstring += "could not find any cookies attatched to header! ";
+  }
+
+  if (userisadmin) {
+    next();
+  } else {
+    //console.log(errorstring);
+    res.status(401).json({
+      success: false,
+      message: "User is not an admin"
+    });
+    return;
   }
 };
 
+//Checkgroup(userid, groupname)
 // internal api call, to be called by backend and not directly from frontend
-const checkGroup = async (group, user) => {
+const checkGroup = async (user, group) => {
+  const pool = getConnectionPool();
   const statement = "SELECT * FROM usergroup where usergroup.groupname = ? and usergroup.username = ?";
   const params = [group, user];
 
-  const result = await connectDatabase(statement, params);
+  const [result] = await pool.execute(statement, params);
   return result.length === 1;
 };
 
-// Username length must be >= 4 and <= 20 characters
-// Username must be unique
-// Username can be alphanumeric and can contain the special character underscore "_"
-const verifyUsername = async username => {
-  let errorstring = "";
-
-  if (username) {
-    // Check if the username length is within the required range
-    if (username.length < 4 || username.length > 20) {
-      errorstring += " Username is not between 4 to 20 characters";
-    }
-
-    // Check if the username contains only alphanumeric characters and underscores
-    const validUsernamePattern = /^[a-zA-Z0-9_]+$/;
-    if (!validUsernamePattern.test(username)) {
-      errorstring += " Username can contains only alphanumeric characters or underscores";
-    }
-
-    const usernamestatement = `SELECT user.username FROM user WHERE user.username = ?`;
-    const usernameparams = [username];
-    try {
-      const usernameresult = await connectDatabase(usernamestatement, usernameparams);
-      // Assuming the database returns an array with the result
-      if (usernameresult.length > 0) {
-        errorstring += " Username already exists in the database";
-      }
-    } catch (error) {
-      // Handle any errors that occur during the database query
-      errorstring += " An error occurred while checking the username. ";
-      console.error("Database error:", error);
-    }
-  } else {
-    return " Username is empty! ";
-  }
-
-  return errorstring;
-};
-
-// Password length must be >= 8 and <=10 characters
-// Password must contain special character
-// Password must contain alphanumeric
-const verifyPassword = async password => {
-  let errorstring = "";
-  if (password) {
-    // Check if the password length is within the required range
-    if (password.length < 8 || password.length > 10) {
-      errorstring += " Password is not between 8 to 10 characters";
-    }
-
-    // Check if the password contains at least one special character
-    const specialCharPattern = /[!@#$%^&*(),.?":{}|<>]/;
-    if (!specialCharPattern.test(password)) {
-      errorstring += " Password must contain atleast 1 special character";
-    }
-
-    // Check if the password contains at least one alphabet character
-    const alphabetPattern = /[a-zA-Z]/;
-    if (!alphabetPattern.test(password)) {
-      errorstring += " Password must contain at least 1 alphabet character.";
-    }
-
-    // Check if the password contains at least one numeric digit
-    const numberPattern = /\d/;
-    if (!numberPattern.test(password)) {
-      errorstring += " Password must contain at least 1 numeric digit.";
-    }
-  } else {
-    return " Password is empty! ";
-  }
-
-  return errorstring;
-};
-
-// Email cannot be empty
-const verifyEmail = async email => {
-  let errorstring = "";
-  console.log("value of email: " + email);
-  // Check if the password length is within the required range
-  if (!email || email.length === 0) {
-    errorstring += " Email cannot be empty";
-  }
-  return errorstring;
-};
-
-// 2 group verfications, one for creating a new group and the other for checking if a group exist within the table
-const verifyGroup = async groupName => {
-  let errorstring = "";
-
-  try {
-    const statement = "SELECT DISTINCT groupname FROM usergroup";
-    const result = await connectDatabase(statement);
-
-    // Extract group names from the result
-    const GroupNames = result.map(row => row.groupname);
-
-    if (GroupNames.includes(groupName)) {
-      errorstring += " group name already exist!";
-    }
-  } catch (error) {
-    console.error("Error:", error);
-    res.status(400).json({
-      success: false,
-      message: error
-    });
-  }
-
-  // Check if the group name length is within the required range
-  if (groupName.length < 4 || groupName.length > 20) {
-    errorstring += " groupname is not between 4 to 20 characters";
-  }
-
-  // Check if the group name contains only allowed characters (alphanumeric and underscore)
-  // Check if the username contains only alphanumeric characters and underscores
-  const validgroupnamePattern = /^[a-zA-Z0-9_]+$/;
-  if (!validgroupnamePattern.test(groupName)) {
-    errorstring += " groupname can contains only alphanumeric characters or underscores";
-  }
-
-  return errorstring;
-};
-
-const checkIfGroupsExist = async group => {
-  let errorstring = "";
-  try {
-    const statement = "SELECT DISTINCT groupname FROM usergroup";
-    const result = await connectDatabase(statement);
-
-    // Extract group names from the result
-    const GroupNames = result.map(row => row.groupname);
-
-    group.forEach(names => {
-      if (!GroupNames.includes(names)) {
-        errorstring += " " + names + " does not exist in database";
-      }
-    });
-  } catch (error) {
-    console.error("Error:", error);
-    res.status(400).json({
-      success: false,
-      message: error
-    });
-  }
-  return errorstring;
-};
-
-module.exports = { verifyUser, verifyAdmin, checkGroup, verifyUsername, verifyPassword, verifyGroup, checkIfGroupsExist, verifyEmail };
+module.exports = { verifyUser, verifyAdmin, checkGroup };
