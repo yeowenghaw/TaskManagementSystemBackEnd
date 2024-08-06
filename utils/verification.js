@@ -67,22 +67,34 @@ const verifyUser = async (req, res, next) => {
 
     // successfully acquired the username from the token we check the database to see if the user has been disabled
     if (decodedTokenusername.length !== 0) {
+      //console.log("getting connection from pool...");
+      const connection = await pool.getConnection();
+      // starting sql transaction...
+      // technically not needed for single select statements, since no changes to database
+     // console.log("starting transaction...");
+      await connection.beginTransaction();
+
       const checkDisabledUserStatement = `SELECT user.disabled FROM user WHERE user.username = ?`;
       const checkDisabledUserparams = [decodedTokenusername];
       try {
-        const [checkDisabledUserresult] = await pool.execute(checkDisabledUserStatement, checkDisabledUserparams);
+        const [checkDisabledUserresult] = await connection.query(checkDisabledUserStatement, checkDisabledUserparams);
         userisdisabled = checkDisabledUserresult[0].disabled;
         if (!userisdisabled) {
           userisdisabled = false;
         } else {
           errorstring += "User is disabled! ";
         }
+        await connection.commit();
       } catch (error) {
         //console.log(error);
+        await connection.rollback();
         errorstring += "could not check if the user is disabled! ";
+      } finally {
+        connection.release();
       }
     }
   } else {
+    //console.log("no cookies attatched");
     errorstring += "could not find any cookies attatched to header! ";
   }
 
@@ -165,11 +177,22 @@ const verifyAdmin = async (req, res, next) => {
 // internal api call, to be called by backend and not directly from frontend
 const checkGroup = async (user, group) => {
   const pool = getConnectionPool();
+  const connection = await pool.getConnection();
   const statement = "SELECT * FROM usergroup where usergroup.groupname = ? and usergroup.username = ?";
   const params = [group, user];
 
-  const [result] = await pool.execute(statement, params);
-  return result.length === 1;
+  try {
+    connection.beginTransaction();
+    const [result] = await connection.query(statement, params);
+    connection.commit();
+    return result.length === 1;
+  } catch (error) {
+    console.log(error);
+    connection.rollback();
+    return false;
+  } finally {
+    connection.release();
+  }
 };
 
 module.exports = { verifyUser, verifyAdmin, checkGroup };

@@ -32,6 +32,10 @@ const getConnectionPool = () => {
     }
     console.log("connection pool created");
   }
+  // const connection = await pool.getConnection();
+  // //console.log(connection);
+  // return connection;
+
   return pool;
 };
 module.exports = { getConnectionPool };

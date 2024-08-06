@@ -10,7 +10,7 @@ const { getConnectionPool } = require("../config/database");
 // /api/v1/login
 // this api call is to be used in the login page
 exports.authenticateUser = async (req, res, next) => {
-  console.log("Authenticating User");
+  //console.log("Authenticating User");
   const pool = getConnectionPool();
   try {
     const requestdata = await req.body;
@@ -31,11 +31,7 @@ exports.authenticateUser = async (req, res, next) => {
 
     const [result] = await pool.execute(statement, params);
 
-    // console.log(result);
-
     // first point of failure, username does not exist in database
-    //console.log(result);
-    //console.log("value of result.length: " + result.length);
     if (result.length != 1) {
       res.status(401).json({
         success: false,

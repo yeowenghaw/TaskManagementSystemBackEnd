@@ -178,15 +178,15 @@ exports.createUser = async (req, res, next) => {
 // svelte server needs to access this
 // this api call is to be used in the user management page
 exports.getUsers = async (req, res, next) => {
-  console.log("Getting All Users");
+  // console.log("Getting All Users");
   const pool = getConnectionPool();
   try {
     const statement = "SELECT user.username, user.email, user.disabled FROM user";
     const [result] = await pool.execute(statement);
 
-    result.forEach(element => {
-      console.log("Username: " + element.username + ", Email: " + element.email + ", Disabled: " + element.disabled);
-    });
+    // result.forEach(element => {
+    //   console.log("Username: " + element.username + ", Email: " + element.email + ", Disabled: " + element.disabled);
+    // });
 
     res.status(200).json({
       success: true,
@@ -707,7 +707,7 @@ exports.getUserGroups = async (req, res, next) => {
 // GET
 // /api/v1/groups
 exports.getGroups = async (req, res, next) => {
-  console.log("getting groups");
+  //console.log("getting groups");
   const pool = getConnectionPool();
   try {
     const statement = "SELECT DISTINCT groupname FROM usergroup";
