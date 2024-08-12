@@ -20,7 +20,7 @@ router.route("/users").get(verifyAdmin, getUsers);
 router.route("/users").post(verifyAdmin, createUser);
 router.route("/users").put(verifyAdmin, updateUser);
 router.route("/groups/usergroups").get(verifyAdmin, getUserGroups);
-router.route("/groups").get(verifyAdmin, getGroups);
+router.route("/groups").get(getGroups);
 router.route("/groups").post(verifyAdmin, createGroup);
 
 module.exports = router;

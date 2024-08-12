@@ -71,7 +71,7 @@ const verifyUser = async (req, res, next) => {
       const connection = await pool.getConnection();
       // starting sql transaction...
       // technically not needed for single select statements, since no changes to database
-     // console.log("starting transaction...");
+      // console.log("starting transaction...");
       await connection.beginTransaction();
 
       const checkDisabledUserStatement = `SELECT user.disabled FROM user WHERE user.username = ?`;
@@ -173,6 +173,69 @@ const verifyAdmin = async (req, res, next) => {
   }
 };
 
+// admin user authentication to be called on usermanagement page
+// will decrypt the token for username, check whether the username is admin or is in the '' group
+const verifyProjectLead = async (req, res, next) => {
+  let errorstring = "";
+  let decodedTokenusername = "";
+  let userisprojectlead = false;
+
+  // acquire the cookie from the request headers
+  const cookies = req.headers.cookie;
+  // getting our connection pool that we will be using for this API call
+
+  // check if there is even any cookie that is attatched to the header, will crash backend since we are using an undefined variable otherwise
+  if (cookies) {
+    //only when the cookie exist can we extract out the token which we will use to acquire the username of the user
+    // stringifying the cookie
+    const JSONCookieString = JSON.stringify(cookies);
+    ////console.log("RAW JWT as JSON: " + JSONCookieString);
+    // parsing out the extra information attatched to acquire the raw token
+    let tokenEndIndex = JSONCookieString.indexOf(";");
+    let tokenStartIndex = JSONCookieString.indexOf("=");
+    if (tokenStartIndex === -1) {
+      tokenStartIndex = 0;
+    }
+    if (tokenEndIndex === -1) {
+      tokenEndIndex = JSONCookieString.length - 1;
+    }
+    const token = JSONCookieString.slice(tokenStartIndex + 1, tokenEndIndex);
+
+    // second user verification check, checking in database whether the use is disabled or not
+    // extracting out the username from the token we acquired...
+
+    try {
+      const decodedToken = await jwt.decode(token);
+      decodedTokenusername = decodedToken.username.username;
+    } catch (error) {
+      // theoratically should never reach here because the token is already verified, put here just incase
+      errorstring += "JWT Token attatched cannot be decoded! ";
+    }
+
+    // now checking if the user is an admin
+    // we want the logical negate of this because these statements prove that the user is an admin
+    if (await checkGroup(decodedTokenusername, "projectlead")) {
+      //console.log("user is either named admin or is in admin group");
+      userisprojectlead = true;
+    } else {
+      errorstring += "user is not a Project Lead! ";
+    }
+  } else {
+    errorstring += "could not find any cookies attatched to header! ";
+  }
+
+  if (userisprojectlead) {
+    next();
+  } else {
+    //console.log(errorstring);
+    res.status(401).json({
+      success: false,
+      message: errorstring
+    });
+    return;
+  }
+};
+
 //Checkgroup(userid, groupname)
 // internal api call, to be called by backend and not directly from frontend
 const checkGroup = async (user, group) => {
@@ -195,4 +258,4 @@ const checkGroup = async (user, group) => {
   }
 };
 
-module.exports = { verifyUser, verifyAdmin, checkGroup };
+module.exports = { verifyUser, verifyAdmin, verifyProjectLead, checkGroup };

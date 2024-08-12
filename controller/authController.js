@@ -129,3 +129,13 @@ exports.checkAdmin = async (req, res, next) => {
     message: "Authorized admin"
   });
 };
+
+// POST
+// /api/v1/projectlead
+// empty call, just as verify user and verify admin inside
+exports.checkProjectLead = async (req, res, next) => {
+  res.status(200).json({
+    success: true,
+    message: "Authorized Project Lead"
+  });
+};

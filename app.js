@@ -22,9 +22,11 @@ app.use(useragent.express());
 // need to import the routes that we are using
 const users = require("./routes/users");
 const auth = require("./routes/auth");
+const task = require("./routes/task");
 
 app.use("/api/v1", auth);
 app.use("/api/v1", users);
+app.use("/api/v1", task);
 
 console.log("app successfully running");
 

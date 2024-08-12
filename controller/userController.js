@@ -712,6 +712,7 @@ exports.getGroups = async (req, res, next) => {
   try {
     const statement = "SELECT DISTINCT groupname FROM usergroup";
     const [result] = await pool.execute(statement);
+    console.log(result);
     res.status(200).json({
       success: true,
       data: result
