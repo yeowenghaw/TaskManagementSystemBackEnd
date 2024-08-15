@@ -6,6 +6,7 @@ var bodyParser = require("body-parser");
 const useragent = require("express-useragent");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
+const nodemailer = require('nodemailer');
 
 dotenv.config({ path: "./config/config.env" });
 

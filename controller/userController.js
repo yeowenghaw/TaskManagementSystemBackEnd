@@ -282,7 +282,7 @@ exports.updateUserProfile = async (req, res, next) => {
 
     // acquiring data sent in request
     const requestdata = await req.body;
-    console.log(requestdata);
+    //console.log(requestdata);
     // acquire the cookie from the request headers
     const cookies = req.headers.cookie;
 
@@ -707,12 +707,13 @@ exports.getUserGroups = async (req, res, next) => {
 // GET
 // /api/v1/groups
 exports.getGroups = async (req, res, next) => {
-  //console.log("getting groups");
+  console.log("getting groups");
   const pool = getConnectionPool();
+  const requestdata = await req.body;
   try {
     const statement = "SELECT DISTINCT groupname FROM usergroup";
     const [result] = await pool.execute(statement);
-    console.log(result);
+    //console.log(result);
     res.status(200).json({
       success: true,
       data: result

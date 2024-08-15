@@ -2,12 +2,13 @@ const express = require("express");
 const router = express.Router();
 
 // importing controller methods form sampleCotroller
-const { authenticateUser, logoutUser, checkUser, checkAdmin, checkProjectLead } = require("../controller/authController");
+const { authenticateUser, logoutUser, checkGroups, checkUser, checkAdmin, checkProjectLead } = require("../controller/authController");
 const { verifyUser, verifyAdmin, verifyProjectLead } = require("../utils/verification");
 
 //
 router.route("/auth/login").post(authenticateUser);
 router.route("/auth/logout").post(logoutUser);
+router.route("/auth/group").get(checkGroups);
 
 router.use(verifyUser);
 router.route("/auth/user").get(checkUser);
