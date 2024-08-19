@@ -6,18 +6,18 @@ var bodyParser = require("body-parser");
 const useragent = require("express-useragent");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
-const nodemailer = require('nodemailer');
+const nodemailer = require("nodemailer");
 
 dotenv.config({ path: "./config/config.env" });
 
 // set cors to only accept
 const options = {
-  origin: "http://localhost:5173",
+  origin: process.env.CORSORIGIN.split(","),
   credentials: true
 };
 
-app.use(cookieParser());
 app.use(cors(options));
+app.use(cookieParser());
 app.use(bodyParser.json());
 app.use(useragent.express());
 // need to import the routes that we are using

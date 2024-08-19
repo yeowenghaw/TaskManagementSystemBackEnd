@@ -428,6 +428,7 @@ exports.createPlan = async (req, res, next) => {
   const pool = getConnectionPool();
   const connection = await pool.getConnection();
   let errorstring = "";
+  let decodedTokenusername = "";
   const requestdata = await req.body;
 
   console.log("plan_MVP_name: " + requestdata.plan_MVP_name);
@@ -470,6 +471,55 @@ exports.createPlan = async (req, res, next) => {
     plan_app_Acronym = requestdata.plan_app_Acronym;
   } else {
     errorstring += "plan_app_Acronym is empty! ";
+  }
+
+  // get usergroups
+
+  const cookies = req.headers.cookie;
+  if (cookies) {
+    //only when the cookie exist can we extract out the token which we will use to acquire the username of the user
+    // stringifying the cookie
+    const JSONCookieString = JSON.stringify(cookies);
+    //console.log("RAW JWT as JSON: " + JSONCookieString);
+    // parsing out the extra information attatched to acquire the raw token
+    let tokenEndIndex = JSONCookieString.indexOf(";");
+    let tokenStartIndex = JSONCookieString.indexOf("=");
+    if (tokenStartIndex === -1) {
+      tokenStartIndex = 0;
+    }
+    if (tokenEndIndex === -1) {
+      tokenEndIndex = JSONCookieString.length - 1;
+    }
+    const token = JSONCookieString.slice(tokenStartIndex + 1, tokenEndIndex);
+    try {
+      const decodedToken = await jwt.decode(token);
+      decodedTokenusername = decodedToken.username.username;
+    } catch (error) {
+      // theoratically should never reach here because the token is already verified, put here just incase
+      errorstring += "JWT Token attatched cannot be decoded! ";
+    }
+  } else {
+    errorstring += "could not find any cookies attatched to header! ";
+    res.status(401).json({
+      success: false,
+      message: errorstring
+    });
+    return;
+  }
+
+  try {
+    const usergroupstatement = "SELECT usergroup.groupname FROM usergroup where usergroup.username = ?";
+    const usergroupparams = [decodedTokenusername];
+    const [usergroupresult] = await connection.query(usergroupstatement, usergroupparams);
+
+    const usergrouparray = usergroupresult.map(item => item.groupname);
+
+    if (!usergrouparray.includes("projectmanager")) {
+      errorstring += decodedTokenusername + " does not have permissions to create a task";
+    }
+  } catch (error) {
+    console.log(error);
+    errorstring += error;
   }
 
   if (errorstring.length > 0) {
@@ -596,6 +646,7 @@ exports.updatePlan = async (req, res, next) => {
   const pool = getConnectionPool();
   const connection = await pool.getConnection();
   let errorstring = "";
+  let decodedTokenusername;
   const requestdata = await req.body;
 
   console.log("plan_MVP_name: " + requestdata.plan_MVP_name);
@@ -638,6 +689,53 @@ exports.updatePlan = async (req, res, next) => {
     plan_app_Acronym = requestdata.plan_app_Acronym;
   } else {
     errorstring += "plan_app_Acronym is empty! ";
+  }
+
+  const cookies = req.headers.cookie;
+  if (cookies) {
+    //only when the cookie exist can we extract out the token which we will use to acquire the username of the user
+    // stringifying the cookie
+    const JSONCookieString = JSON.stringify(cookies);
+    //console.log("RAW JWT as JSON: " + JSONCookieString);
+    // parsing out the extra information attatched to acquire the raw token
+    let tokenEndIndex = JSONCookieString.indexOf(";");
+    let tokenStartIndex = JSONCookieString.indexOf("=");
+    if (tokenStartIndex === -1) {
+      tokenStartIndex = 0;
+    }
+    if (tokenEndIndex === -1) {
+      tokenEndIndex = JSONCookieString.length - 1;
+    }
+    const token = JSONCookieString.slice(tokenStartIndex + 1, tokenEndIndex);
+    try {
+      const decodedToken = await jwt.decode(token);
+      decodedTokenusername = decodedToken.username.username;
+    } catch (error) {
+      // theoratically should never reach here because the token is already verified, put here just incase
+      errorstring += "JWT Token attatched cannot be decoded! ";
+    }
+  } else {
+    errorstring += "could not find any cookies attatched to header! ";
+    res.status(401).json({
+      success: false,
+      message: errorstring
+    });
+    return;
+  }
+
+  try {
+    const usergroupstatement = "SELECT usergroup.groupname FROM usergroup where usergroup.username = ?";
+    const usergroupparams = [decodedTokenusername];
+    const [usergroupresult] = await connection.query(usergroupstatement, usergroupparams);
+
+    const usergrouparray = usergroupresult.map(item => item.groupname);
+
+    if (!usergrouparray.includes("projectmanager")) {
+      errorstring += decodedTokenusername + " does not have permissions to create a task";
+    }
+  } catch (error) {
+    console.log(error);
+    errorstring += error;
   }
 
   if (errorstring.length > 0) {
@@ -985,6 +1083,8 @@ exports.updateTask = async (req, res, next) => {
   if (!newtaskplan || newtaskplan.length < 1) {
     newtaskplan = null;
   }
+
+  console.log("newtasknotes: " + newtasknotes);
 
   // using the task_id, acquire the original state of the task before this intended change
 
